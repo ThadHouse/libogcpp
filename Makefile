@@ -2,13 +2,7 @@
 # Clear the implicit built in rules
 #---------------------------------------------------------------------------------
 .SUFFIXES:
-.SECONDARY:
 #---------------------------------------------------------------------------------
-# prevent deletion of implicit targets
-#---------------------------------------------------------------------------------
-.SECONDARY:
-#---------------------------------------------------------------------------------
-
 ifeq ($(strip $(DEVKITPPC)),)
 $(error "Please set DEVKITPPC in your environment. export DEVKITPPC=<path to>devkitPPC")
 endif
@@ -23,16 +17,16 @@ include $(DEVKITPPC)/wii_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	libogcpp
 BUILD		:=	build
-SOURCES		:=	source
-DATA		:=
-INCLUDES	:= include
+SOURCES		:=	src
+DATA		:=	data
+INCLUDES	:=
 
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
 
-CFLAGS		=	-g -O2 -Wall -Wextra $(MACHDEP) $(INCLUDE)
-CXXFLAGS	=	$(CFLAGS) -std=c++14
+CFLAGS	= -g -O2 -Wall $(MACHDEP) $(INCLUDE)
+CXXFLAGS	=	$(CFLAGS)
 
 LDFLAGS	=	-g $(MACHDEP) -Wl,-Map,$(notdir $@).map
 
@@ -102,7 +96,7 @@ export OUTPUT	:=	$(CURDIR)/lib/wii/$(TARGET)
 .PHONY: $(BUILD) clean
 
 #---------------------------------------------------------------------------------
-HTARGETS		:=	$(addprefix include/wit/,$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.h))))
+HTARGETS		:=	$(addprefix include/ogcpp/,$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.h))))
 
 $(BUILD): $(HTARGETS)
 	@[ -d $@ ] || mkdir -p $@
@@ -120,20 +114,25 @@ install: $(HTARGETS) $(OUTPUT).a
 	cp -f $(OUTPUT).a $(DEVKITPRO)/libogc/lib/wii/
 
 uninstall:
-	rm -f $(DEVKITPRO)/libogc/include/ogcpp $(DEVKITPRO)/libogc/lib/wii/libogcpp.a
+	rm -rf $(DEVKITPRO)/libogc/include/ogcpp $(DEVKITPRO)/libogc/lib/wii/libogcpp.a
 
-dist: $(HTARGETS) $(BUILD)
+docs:
+	doxygen ogcpp.doxygen
+
+docsclean:
+	@echo removing docs...
+	@rm -rf doc
+
+dist: $(HTARGETS) $(BUILD) docs
 	tar cjf libogcpp.tar.bz2 include lib doc
 
-distclean: clean
+distclean: clean docsclean
 	rm -f libogcpp.tar.bz2
-
 
 #---------------------------------------------------------------------------------
 clean:
 	@echo clean ...
-	@rm -fr $(BUILD) lib
-#---------------------------------------------------------------------------------
+	@rm -fr $(BUILD) include lib
 
 #---------------------------------------------------------------------------------
 else
@@ -143,24 +142,18 @@ DEPENDS	:=	$(OFILES:.o=.d)
 #---------------------------------------------------------------------------------
 # main targets
 #---------------------------------------------------------------------------------
+
 $(OUTPUT).a: $(OFILES)
 
 #---------------------------------------------------------------------------------
-# This rule links in binary data with the .bin extension
+# This rule links in binary data with the .jpg extension
 #---------------------------------------------------------------------------------
-%.bin.o	:	%.bin
+%.jpg.o	:	%.jpg
 #---------------------------------------------------------------------------------
 	@echo $(notdir $<)
 	$(bin2o)
 
-#---------------------------------------------------------------------------------
-%.tpl.o	:	%.tpl
-#---------------------------------------------------------------------------------
-	@echo $(notdir $<)
-	@$(bin2o)
-
-
--include $(DEPSDIR)/*.d
+-include $(DEPENDS)
 
 #---------------------------------------------------------------------------------
 endif

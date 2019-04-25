@@ -1,6 +1,6 @@
-#include "ogcpp/mutex.h"
-#include "ogcpp/condition_variable.h"
-#include "ogcpp/thread.h"
+#include "mutex.h"
+#include "condition_variable.h"
+#include "thread.h"
 
 void func() {
   gc::mutex mutex;
