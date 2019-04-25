@@ -1,0 +1,2 @@
+https://libogc.devkitpro.org/
+Link to docs
