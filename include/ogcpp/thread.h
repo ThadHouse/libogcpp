@@ -14,7 +14,7 @@ public:
   template <class Callable, class... Args>
   explicit thread(Callable &&f, Args &&... args)
   {
-    StartThread(makeState(__make_invoker(std::forward<Callable>(f), std::forward<args>(args)...)));
+    StartThread(makeState(__make_invoker(std::forward<Callable>(f), std::forward<Args>(args)...)));
   }
 
   thread() noexcept : m_thread{0} {}
@@ -52,21 +52,26 @@ public:
     LWP_JoinThread(m_thread, &param);
   }
 
+  void detach() {
+    m_thread = 0;
+  }
+
 private:
   lwp_t m_thread;
 
   struct State
   {
-    virtual ~State();
+    virtual ~State() = default;
     virtual void m_run() = 0;
   };
-  using StatePtr = std::unique_ptr<State>;
+  using StatePtr = State *;
 
   template <typename Callable>
   struct StateImpl : public State
   {
     Callable m_func;
     StateImpl(Callable &&f) : m_func(std::forward<Callable>(f)) {}
+    ~StateImpl() override = default;
     void m_run() override { m_func(); }
   };
 
@@ -75,16 +80,17 @@ private:
     LWP_CreateThread(&m_thread, [](void *param) -> void * {
       auto state = reinterpret_cast<gc::thread::State *>(param);
       state->m_run();
+      delete state;
       return nullptr;
     },
-                     state.get(), nullptr, 0, 50);
+                     state, nullptr, 0, 50);
   }
 
   template <typename Callable>
   static StatePtr makeState(Callable &&f)
   {
     using impl = StateImpl<Callable>;
-    return std::make_unique<impl>(std::forward<Callable>(f));
+    return new impl{std::forward<Callable>(f)};
   }
 
   // A call wrapper that does INVOKE(forwarded tuple elements...)

@@ -1,6 +1,7 @@
 #include "mutex.h"
 #include "condition_variable.h"
 #include "thread.h"
+#include <thread>
 
 void func() {
   gc::mutex mutex;
@@ -9,7 +10,7 @@ void func() {
 
   cond.wait(lock);
 
-  gc::thread thr([](){
+  gc::thread thr([](const int& x){
 
-  });
+  }, 5);
 }
