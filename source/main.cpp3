@@ -1,0 +1,109 @@
+#include <memory>
+#include <thread>
+#include <atomic>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <cstring>
+
+#include "code.h"
+#include <gccore.h>
+#include <wiiuse/wpad.h>
+
+static volatile s8 HWButton = -1;
+
+static void *xfb = NULL;
+static GXRModeObj *rmode = NULL;
+
+static	lwp_t threadHandle = (lwp_t)NULL;
+
+int main() {
+  VIDEO_Init();
+  PAD_Init();
+  WPAD_Init();
+
+  rmode = VIDEO_GetPreferredMode(NULL);
+  xfb = MEM_K0_TO_K1(SYS_AllocateFramebuffer(rmode));
+  console_init(xfb,20,20,rmode->fbWidth,rmode->xfbHeight,rmode->fbWidth*VI_DISPLAY_PIX_SZ);
+
+  VIDEO_Configure(rmode);
+  VIDEO_SetNextFramebuffer(xfb);
+  VIDEO_SetBlack(FALSE);
+  VIDEO_Flush();
+
+	VIDEO_WaitVSync();
+	if(rmode->viTVMode&VI_NON_INTERLACE) VIDEO_WaitVSync();
+
+  printf("\x1b[2;0H");
+  printf("Hello World!");
+
+  SYS_SetResetCallback([](u32 irq, void* ctx){
+    HWButton = SYS_RETURNTOMENU;
+  });
+  SYS_SetPowerCallback([]{
+    HWButton = SYS_POWEROFF_STANDBY;
+  });
+
+  WPAD_SetPowerButtonCallback([](s32 channel){
+    HWButton = SYS_POWEROFF_STANDBY;
+  });
+
+
+  std::atomic_bool keepRunning{true};
+
+  LWP_CreateThread(&threadHandle, [](void* param) -> void* {
+    auto aBool = reinterpret_cast<decltype(keepRunning)*>(param);
+    while(aBool->load()) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    }
+    return nullptr;
+  }, &keepRunning,NULL, 0,50);
+
+  int count = 0;
+
+  while (1) {
+    //u32 gcPads = PAD_ScanPads();
+    u32 wiiPads = WPAD_ScanPads();
+
+    if (HWButton != -1) {
+      break;
+    }
+
+    PADStatus status[4];
+    std::memset(status, 0, sizeof(status));
+    u32 read = PAD_Read(status);
+
+      printf("\x1b[2;0H");
+    //printf("Hello World! %08x %08x\n", gcPads, wiiPads);
+
+
+    printf("PAD1: %08x %08x\n", status[0].err, status[0].button);
+    printf("PAD2: %08x %08x\n", status[0].err, status[1].button);
+    printf("PAD3: %08x %08x\n", status[0].err, status[2].button);
+    printf("PAD4: %08x %08x\n", status[0].err, status[3].button);
+    count++;
+
+
+  		// WPAD_ButtonsDown tells us which buttons were pressed in this loop
+		// this is a "one shot" state which will not fire again until the button has been released
+		u32 pressed = WPAD_ButtonsDown(0);
+
+		// We return to the launcher application via exit
+		if ( pressed & WPAD_BUTTON_HOME ) exit(0);
+
+    VIDEO_WaitVSync();
+  }
+
+  keepRunning.store(false);
+  // thr.join();
+
+  void* retVal = nullptr;
+
+  LWP_JoinThread(threadHandle, &retVal);
+
+  if (HWButton != -1) {
+    SYS_ResetSystem(HWButton, 0, 0);
+  }
+
+  return 0;
+}
